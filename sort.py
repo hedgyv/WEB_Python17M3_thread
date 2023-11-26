@@ -4,20 +4,10 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 from threading import Lock
 
-
-CYRILLIC_SYMBOLS = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяєіїґ"
-TRANSLATION = ("a", "b", "v", "g", "d", "e", "e", "j", "z", "i", "j", "k", "l", "m", "n", "o", "p", "r", "s", "t", "u",
-               "f", "h", "ts", "ch", "sh", "sch", "", "y", "", "e", "yu", "ya", "je", "i", "ji", "g")
-
-TRANS = {}
-
-for c, t in zip(CYRILLIC_SYMBOLS, TRANSLATION):
-    TRANS[ord(c)] = t
-    TRANS[ord(c.upper())] = t.upper()
-    #print(TRANS)
+lock = Lock()
 
 path_parent = 'C://Users/Yaroslav/OneDrive/Рабочий стол/ToSort/'
-#text_file = 'C://Users/Yaroslav/OneDrive/Рабочий стол/ToSort/text_1.txt'
+
 
 p = Path(path_parent)
 p_audio = Path(path_parent + '/' + 'audio')
@@ -29,12 +19,26 @@ p_video = Path(path_parent + '/' + 'video')
 def delete_empty_dirs_with_thread():
     with ThreadPoolExecutor() as executor:
         executor.submit(check_and_delete_empty_dir, p)
-
+        
+def sort_files_with_tread():
+    with ThreadPoolExecutor() as executor:
+        executor.submit(sort_files_folders, p)
+    
 
 def normalize(name):
-    #print(name)
+    CYRILLIC_SYMBOLS = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяєіїґ"
+    TRANSLATION = ("a", "b", "v", "g", "d", "e", "e", "j", "z", "i", "j", "k", "l", "m", "n", "o", "p", "r", "s", "t", "u",
+               "f", "h", "ts", "ch", "sh", "sch", "", "y", "", "e", "yu", "ya", "je", "i", "ji", "g")
+
+    TRANS = {}
+
+    for c, t in zip(CYRILLIC_SYMBOLS, TRANSLATION):
+        TRANS[ord(c)] = t
+        TRANS[ord(c.upper())] = t.upper()
+
     element = name.translate(TRANS)
     return element
+
 
 def check_and_delete_empty_dir(p):
     for i in p.iterdir():
@@ -44,16 +48,15 @@ def check_and_delete_empty_dir(p):
                         and i.name != p_img.name \
                             and i.name != p_docs.name \
                                 and i.name != p_video.name:        
-            shutil.rmtree(i)
+            with lock:
+                shutil.rmtree(i)
     
 def sort_files_folders(p):
     
-    # print(p)
     for i in p.iterdir():
         
         p_new = ''
         if i.is_dir():
-            print(i.name)
             p_new = str(i)
         
             sort_files_folders(Path(p_new))
@@ -61,7 +64,6 @@ def sort_files_folders(p):
         if i.is_file():  
             name_without_extension = i.stem
             ext = i.suffix
-            #print(ext)
             new_name = normalize(name_without_extension) #передать имя каждого файла
             if ext == '.jpeg' or ext == '.png' or ext == '.jpg' or ext == '.svg':
                 i.rename(Path(p_img, new_name + ext))
@@ -78,16 +80,15 @@ def sort_files_folders(p):
                         shutil.unpack_archive(arc, Path(str(p_arhs) + '/' + name_without_extension))
             else: 
                 i.rename(Path(p, new_name + ext))
-
-        
-                 
-
-
+            print(i)
+    
 if __name__ == '__main__':
     sort_files_folders(p)
     
     logging.basicConfig(level=logging.DEBUG, format="%(threadName)s %(message)s")
     
     delete_empty_dirs_with_thread()
+    
+    sort_files_with_tread()
     
     logging.debug("Done")
